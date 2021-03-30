@@ -450,3 +450,4 @@ class Params:
         self.areaRng = [ [0**2,1e5**2], [0**2, 32**2], [32**2, 96**2], [96**2, 1e5**2] ]
         self.useSegm = 0
         self.useCats = 1
+        self.areaRngLbl = ['all', 'small', 'medium', 'large']

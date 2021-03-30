@@ -504,6 +504,7 @@ class customCOCOeval(COCOeval):
             return stats
         if not self.eval:
             raise Exception('Please run accumulate() first')
+        self.params.iouType = 'bbox'
         iouType = self.params.iouType
         if iouType == 'segm' or iouType == 'bbox':
             summarize = _summarizeDets
