@@ -32,6 +32,7 @@ from model.rpn.bbox_transform import bbox_transform_inv
 from model.utils.net_utils import save_net, load_net, vis_detections
 from model.faster_rcnn.vgg16 import vgg16
 from model.faster_rcnn.resnet import resnet
+from tqdm import tqdm
 
 import pdb
 
@@ -117,7 +118,7 @@ def parse_args():
                       default=10, type=int)
   parser.add_argument('--p', dest='checkpoint',
                       help='checkpoint to load network',
-                      default=1663, type=int)
+                      default=13311, type=int)
   parser.add_argument('--vis', dest='vis',
                       help='visualization mode',
                       action='store_true')
@@ -281,14 +282,14 @@ if __name__ == '__main__':
     print(det_file)
     
     
-    for i,index in enumerate(ratio_index_vu[0]):
+    for i,index in enumerate(tqdm(ratio_index_vu[0])):
       
       data = next(data_iter_vu)
-      im_data.data.resize_(data[0].size()).copy_(data[0])
-      query.data.resize_(data[1].size()).copy_(data[1])
-      im_info.data.resize_(data[2].size()).copy_(data[2])
-      gt_boxes.data.resize_(data[3].size()).copy_(data[3])
-      catgory.data.resize_(data[4].size()).copy_(data[4])
+      im_data.resize_(data[0].size()).copy_(data[0])
+      query.resize_(data[1].size()).copy_(data[1])
+      im_info.resize_(data[2].size()).copy_(data[2])
+      gt_boxes.resize_(data[3].size()).copy_(data[3])
+      catgory.resize_(data[4].size()).copy_(data[4])
 
       det_tic = time.time()
       rois, cls_prob, bbox_pred, \
@@ -332,8 +333,7 @@ if __name__ == '__main__':
       det_toc = time.time()
       detect_time = det_toc - det_tic
       misc_tic = time.time()
-      if vis and i%1==0:
-        print(i)
+      if vis and i%100 == 0:
         im = cv2.imread(dataset_vu._roidb[dataset_vu.ratio_index[i]]['image'])
         im2show = np.copy(im)
 
@@ -372,7 +372,7 @@ if __name__ == '__main__':
           .format(i + 1, num_detect, detect_time, nms_time))
       sys.stdout.flush()
 
-      if vis and i%1==0:
+      if vis:
         o_query = data[1][0].permute(1, 2,0).contiguous().cpu().numpy()
         o_query *= [0.229, 0.224, 0.225]
         o_query += [0.485, 0.456, 0.406]
@@ -381,18 +381,18 @@ if __name__ == '__main__':
 
         (h,w,c) = im2show.shape
         o_query = cv2.resize(o_query, (h, h),interpolation=cv2.INTER_LINEAR)
-        # im2show = np.concatenate((im2show, o_query), axis=1)
+        im2show = np.concatenate((im2show, o_query), axis=1)
 
         cv2.imwrite('./test_img/%d.png'%(i), im2show)
     
   
     with open(det_file, 'wb') as f:
-        print('hi')
+
         pickle.dump([all_boxes, all_weight, all_times], f, pickle.HIGHEST_PROTOCOL)
 
     with open(det_file, 'rb') as fid:
         [all_boxes, all_weight, all_times] = pickle.load(fid)
-    save_weight(all_weight, all_times, args.seen)
+    # save_weight(all_weight, all_times, args.seen)
 
     print('Evaluating detections')
     aps = imdb_vu.evaluate_detections(all_boxes, output_dir_vu) 
