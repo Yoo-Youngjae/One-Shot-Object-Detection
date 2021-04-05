@@ -395,8 +395,8 @@ if __name__ == '__main__':
         all_boxes[data[4]][index] = cls_dets.cpu().numpy()
 
         im2show = vis_detections(im2show, 'shot', cls_dets.cpu().numpy(), 0.8)
-        im2show = np.concatenate((im2show, _query_im), axis=1)
-        plt.imshow(im2show)
+        _im2show = np.concatenate((im2show, _query_im), axis=1)
+        plt.imshow(_im2show)
         plt.show()
 
 
@@ -424,7 +424,10 @@ if __name__ == '__main__':
 
     (h, w, c) = im2show.shape
     o_query = cv2.resize(o_query, (h, h), interpolation=cv2.INTER_LINEAR)
+    o_query = cv2.cvtColor(o_query, cv2.COLOR_BGR2RGB)
+
     im2show = np.concatenate((im2show, o_query), axis=1)
+    im2show = cv2.cvtColor(im2show, cv2.COLOR_BGR2RGB)
 
 
     cv2.imwrite('./test_img/%d.png' % (i), im2show)
