@@ -189,10 +189,7 @@ lr = cfg.TRAIN.LEARNING_RATE
 momentum = cfg.TRAIN.MOMENTUM
 weight_decay = cfg.TRAIN.WEIGHT_DECAY
 
-if __name__ == '__main__':
-
-    args = parse_args()
-
+def main(scene_img_path, query_img_path):
     if torch.cuda.is_available() and not args.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
@@ -257,26 +254,20 @@ if __name__ == '__main__':
         catgory = catgory.cuda()
         gt_boxes = gt_boxes.cuda()
 
-    # make variable
-    im_data = Variable(im_data)
-    query = Variable(query)
-    im_info = Variable(im_info)
-    catgory = Variable(catgory)
-    gt_boxes = Variable(gt_boxes)
+
 
     if args.cuda:
         cfg.CUDA = True
         fasterRCNN.cuda()
 
-    start = time.time()
+
     max_per_image = 100
 
-    vis = args.vis
+
 
     thresh = 0.05
 
 
-    save_name = 'faster_rcnn_10'
 
     # output_dir_vs = get_output_dir(imdb_vs, 'faster_rcnn_seen')
     output_dir_vu = get_output_dir(imdb_vu, 'faster_rcnn_unseen')
@@ -286,16 +277,15 @@ if __name__ == '__main__':
     dataset_vu = roibatchLoader(roidb_vu, ratio_list_vu, ratio_index_vu, query_vu, 1, imdb_vu.num_classes,
                                 training=False, seen=args.seen)
     fasterRCNN.eval()
-    all_ap = []
+
 
     avg = 0
     dataset_vu.query_position = avg
-    dataloader_vu = torch.utils.data.DataLoader(dataset_vu, batch_size=1, shuffle=False, num_workers=0,
-                                                pin_memory=True)
 
-    data_iter_vu = iter(dataloader_vu)
+
+
     num_images_vu = len(imdb_vu.image_index)
-    num_detect = len(ratio_index_vu[0])
+
 
     all_boxes = [[[] for _ in xrange(num_images_vu)]
                  for _ in xrange(imdb_vu.num_classes)]
@@ -309,18 +299,18 @@ if __name__ == '__main__':
     index = 0
 
     data = [0, 0, 0, 0, 0]
-    version = 'custom'      # coco is completed
-    if version == 'coco':
-        im = imread('/home/yjyoo/PycharmProjects/data/coco/images/val2017/000000397133.jpg')
-        query_im = imread('/home/yjyoo/PycharmProjects/data/coco/images/val2017/000000007816.jpg')
-        query_im = crop(query_im, [505.54, 53.01, 543.08, 164.09], size=128)
-    else:
-        im = imread('test/scene.jpeg')
-        im = cv2.resize(im, dsize=(640, 480), interpolation=cv2.INTER_LINEAR)
-        query_im = imread('test/query.jpeg')
-        query_im = cv2.resize(query_im, dsize=(640, 480), interpolation=cv2.INTER_LINEAR)
-        _im = np.copy(im)
-        _query_im = np.copy(query_im)
+    # version = 'custom'      # coco is completed
+    # if version == 'coco':
+    #     im = imread('/home/yjyoo/PycharmProjects/data/coco/images/val2017/000000397133.jpg')
+    #     query_im = imread('/home/yjyoo/PycharmProjects/data/coco/images/val2017/000000007816.jpg')
+    #     query_im = crop(query_im, [505.54, 53.01, 543.08, 164.09], size=128)
+    # else:
+    im = imread(scene_img_path)
+    im = cv2.resize(im, dsize=(640, 480), interpolation=cv2.INTER_LINEAR)
+    query_im = imread(query_img_path)
+    query_im = cv2.resize(query_im, dsize=(640, 480), interpolation=cv2.INTER_LINEAR)
+    _im = np.copy(im)
+    _query_im = np.copy(query_im)
     # make im_data
 
     im, im_scale = prep_im_for_blob(im, target_size=600)
@@ -413,7 +403,6 @@ if __name__ == '__main__':
             pass
 
     misc_toc = time.time()
-    nms_time = misc_toc - misc_tic
 
 
     o_query = data[1][0].permute(1, 2, 0).contiguous().cpu().numpy()
@@ -431,4 +420,13 @@ if __name__ == '__main__':
 
 
     cv2.imwrite('./test_img/%d.png' % (i), im2show)
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    scene_img_path = 'test/scene.jpeg'
+    query_img_path = 'test/query.jpeg'
+    main(scene_img_path, query_img_path)
+
+
 
