@@ -13,7 +13,7 @@ def recvall(sock, count):
     return buf
 
 #수신에 사용될 내 ip와 내 port번호
-TCP_IP = 'localhost'
+TCP_IP = '147.46.219.160'
 TCP_PORT = 5001
 
 #TCP소켓 열고 수신 대기
@@ -28,6 +28,7 @@ stringData = recvall(conn, int(length))
 data = numpy.fromstring(stringData, dtype='uint8')
 s.close()
 decimg=cv2.imdecode(data,1)
-cv2.imshow('SERVER',decimg)
+im2show = cv2.cvtColor(decimg, cv2.COLOR_BGR2RGB)
+cv2.imshow('SERVER',im2show)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
