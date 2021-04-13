@@ -190,8 +190,10 @@ def parse_args():
 lr = cfg.TRAIN.LEARNING_RATE
 momentum = cfg.TRAIN.MOMENTUM
 weight_decay = cfg.TRAIN.WEIGHT_DECAY
+thresh = 0.05
+max_per_image = 100
 
-def main(cv2_img, query_img_path):
+def get_ready(query_img_path):
     if torch.cuda.is_available() and not args.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
@@ -248,13 +250,7 @@ def main(cv2_img, query_img_path):
     catgory = torch.LongTensor(1)
     gt_boxes = torch.FloatTensor(1)
 
-    # ship to cuda
-    if args.cuda:
-        im_data = im_data.cuda()
-        query = query.cuda()
-        im_info = im_info.cuda()
-        catgory = catgory.cuda()
-        gt_boxes = gt_boxes.cuda()
+
 
 
 
@@ -263,18 +259,8 @@ def main(cv2_img, query_img_path):
         fasterRCNN.cuda()
 
 
-    max_per_image = 100
 
-
-
-    thresh = 0.05
-
-
-
-    # output_dir_vs = get_output_dir(imdb_vs, 'faster_rcnn_seen')
     output_dir_vu = get_output_dir(imdb_vu, 'faster_rcnn_unseen')
-    all_weight = np.zeros((len(ratio_index_vu[0]), 1024))
-    all_times = np.zeros((imdb_vu.num_classes))
 
     dataset_vu = roibatchLoader(roidb_vu, ratio_list_vu, ratio_index_vu, query_vu, 1, imdb_vu.num_classes,
                                 training=False, seen=args.seen)
@@ -296,55 +282,47 @@ def main(cv2_img, query_img_path):
     det_file = os.path.join(output_dir_vu, 'detections_%d_%d.pkl' % (args.seen, avg))
     print(det_file)
 
-
-    i = 0
-    index = 0
-
-    data = [0, 0, 0, 0, 0]
-    # version = 'custom'      # coco is completed
-    # if version == 'coco':
-    #     im = imread('/home/yjyoo/PycharmProjects/data/coco/images/val2017/000000397133.jpg')
-    #     query_im = imread('/home/yjyoo/PycharmProjects/data/coco/images/val2017/000000007816.jpg')
-    #     query_im = crop(query_im, [505.54, 53.01, 543.08, 164.09], size=128)
-    # else:
-    im = cv2_img
-    im = cv2.resize(im, dsize=(640, 480), interpolation=cv2.INTER_LINEAR)
+    # make query data
     query_im = imread(query_img_path)
     query_im = cv2.resize(query_im, dsize=(640, 480), interpolation=cv2.INTER_LINEAR)
-    _im = np.copy(im)
     _query_im = np.copy(query_im)
-    # make im_data
+    query_im, query_im_scale = prep_im_for_blob(query_im, target_size=128)
+    query_im = torch.tensor(query_im)
+    query_im = torch.unsqueeze(query_im, 0)
+    query_im = query_im.transpose(1, 3)
+    query = query_im.transpose(2, 3)
+    query  = query.cuda()
 
+    return fasterRCNN, all_boxes, query, _query_im
+
+def main(cv2_img, fasterRCNN, all_boxes, query, _query_im):
+
+    index = 0
+    data = [0, 0, 0, 0, 0]
+    im = cv2_img
+    im = cv2.resize(im, dsize=(640, 480), interpolation=cv2.INTER_LINEAR)
+
+    _im = np.copy(im)
+
+    # make im_data
     im, im_scale = prep_im_for_blob(im, target_size=600)
     im = torch.tensor(im)
     im = torch.unsqueeze(im, 0)
     im = im.transpose(1, 3)
     im_data = im.transpose(2, 3)
 
-    # make query data
-
-    query_im, query_im_scale = prep_im_for_blob(query_im, target_size=128)
-    query_im = torch.tensor(query_im)
-    query_im = torch.unsqueeze(query_im, 0)
-    query_im = query_im.transpose(1, 3)
-    query = query_im.transpose(2, 3)
-
     im_data = data[0] = im_data.cuda()
-    query = data[1] = query.cuda()
     im_info = data[2] = torch.tensor([[600, 899, 1.4052]])
     gt_boxes = data[3] = torch.rand(1, 4, 5) # don't care
     catgory = data[4] = torch.tensor([1])
 
 
-    det_tic = time.time()
+
     rois, cls_prob, bbox_pred, \
     rpn_loss_cls, rpn_loss_box, \
     RCNN_loss_cls, _, RCNN_loss_bbox, \
     rois_label, weight = fasterRCNN(im_data, query, im_info, gt_boxes, catgory)
 
-    # all_weight[data[4],:] = all_weight[data[4],:] + weight.view(-1).detach().cpu().numpy()
-    all_weight[i, :] = weight.view(-1).detach().cpu().numpy()
-    all_times[data[4]] = all_times[data[4]] + 1
 
     scores = cls_prob.data
     boxes = rois.data[:, :, 1:5]
@@ -365,9 +343,6 @@ def main(cv2_img, query_img_path):
 
     scores = scores.squeeze()
     pred_boxes = pred_boxes.squeeze()
-    det_toc = time.time()
-    detect_time = det_toc - det_tic
-    misc_tic = time.time()
 
     im2show = np.copy(_im)
 
@@ -392,36 +367,35 @@ def main(cv2_img, query_img_path):
         plt.show()
 
 
-    # Limit to max_per_image detections *over all classes*
-    if max_per_image > 0:
-        try:
-            image_scores = all_boxes[data[4]][index][:, -1]
-            if len(image_scores) > max_per_image:
-                image_thresh = np.sort(image_scores)[-max_per_image]
+    # # Limit to max_per_image detections *over all classes*
+    # if max_per_image > 0:
+    #     try:
+    #         image_scores = all_boxes[data[4]][index][:, -1]
+    #         if len(image_scores) > max_per_image:
+    #             image_thresh = np.sort(image_scores)[-max_per_image]
+    #
+    #             keep = np.where(all_boxes[data[4]][index][:, -1] >= image_thresh)[0]
+    #             all_boxes[data[4]][index] = all_boxes[data[4]][index][keep, :]
+    #     except:
+    #         pass
+    #
+    #
+    # o_query = query[0].permute(1, 2, 0).contiguous().cpu().numpy()
+    # o_query *= [0.229, 0.224, 0.225]
+    # o_query += [0.485, 0.456, 0.406]
+    # o_query *= 255
+    # o_query = o_query[:, :, ::-1]
+    #
+    # (h, w, c) = im2show.shape
+    # o_query = cv2.resize(o_query, (h, h), interpolation=cv2.INTER_LINEAR)
+    # o_query = cv2.cvtColor(o_query, cv2.COLOR_BGR2RGB)
+    #
+    # im2show = np.concatenate((im2show, o_query), axis=1)
+    # im2show = cv2.cvtColor(im2show, cv2.COLOR_BGR2RGB)
+    # plt.imshow(im2show)
+    # plt.show()
 
-                keep = np.where(all_boxes[data[4]][index][:, -1] >= image_thresh)[0]
-                all_boxes[data[4]][index] = all_boxes[data[4]][index][keep, :]
-        except:
-            pass
-
-    misc_toc = time.time()
-
-
-    o_query = data[1][0].permute(1, 2, 0).contiguous().cpu().numpy()
-    o_query *= [0.229, 0.224, 0.225]
-    o_query += [0.485, 0.456, 0.406]
-    o_query *= 255
-    o_query = o_query[:, :, ::-1]
-
-    (h, w, c) = im2show.shape
-    o_query = cv2.resize(o_query, (h, h), interpolation=cv2.INTER_LINEAR)
-    o_query = cv2.cvtColor(o_query, cv2.COLOR_BGR2RGB)
-
-    im2show = np.concatenate((im2show, o_query), axis=1)
-    im2show = cv2.cvtColor(im2show, cv2.COLOR_BGR2RGB)
-
-
-    cv2.imwrite('./test_img/%d.png' % (i), im2show)
+    # cv2.imwrite('./test_img/%d.png' % (i), im2show)
 
 def recvall(sock, count):
     buf = b''
@@ -443,17 +417,21 @@ if __name__ == '__main__':
     s.listen(True)
     conn, addr = s.accept()
 
-    # String형의 이미지를 수신받아서 이미지로 변환 하고 화면에 출력
-    length = recvall(conn, 16)  # 길이 16의 데이터를 먼저 수신하는 것은 여기에 이미지의 길이를 먼저 받아서 이미지를 받을 때 편리하려고 하는 것이다.
-    stringData = recvall(conn, int(length))
-    data = np.fromstring(stringData, dtype='uint8')
-    s.close()
 
-    decimg = cv2.imdecode(data, 1)
-    # im2show = cv2.cvtColor(decimg, cv2.COLOR_BGR2RGB)
     query_img_path = 'test/query.jpeg'
 
-    main(decimg, query_img_path)
+    fasterRCNN, all_boxes, query, _query_im = get_ready(query_img_path)
+    while True:
+        try:
+            # String형의 이미지를 수신받아서 이미지로 변환 하고 화면에 출력
+            length = recvall(conn, 16)  # 길이 16의 데이터를 먼저 수신하는 것은 여기에 이미지의 길이를 먼저 받아서 이미지를 받을 때 편리하려고 하는 것이다.
+            stringData = recvall(conn, int(length))
+            data = np.fromstring(stringData, dtype='uint8')
+            decimg = cv2.imdecode(data, 1)
+            main(decimg, fasterRCNN, all_boxes, query, _query_im)
+        except:
+            s.close()
+            exit()
 
 
 
