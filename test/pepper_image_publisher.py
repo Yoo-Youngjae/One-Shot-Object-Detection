@@ -9,31 +9,18 @@ import numpy as np
 import time
 from matplotlib import pyplot as plt
 
-def send_image(im):
-    TCP_IP = '147.46.219.160'
-    TCP_PORT = 5001
-
+def send_image(im, sock):
 
     frame = np.array(im)
-
-
     encode_param=[int(cv2.IMWRITE_JPEG_QUALITY),90]
     result, imgencode = cv2.imencode('.jpg', frame, encode_param)
     data = numpy.array(imgencode)
     stringData = data.tostring()
-
-    decimg = cv2.imdecode(data, 1)
-    plt.imshow(decimg)
-    plt.show()
-
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((TCP_IP, TCP_PORT))
-
-
     sock.send(str(len(stringData)).ljust(16))
     sock.send(stringData)
-    sock.close()
-
+    # decimg = cv2.imdecode(data, 1)
+    # plt.imshow(decimg)
+    # plt.show()
 
     # decimg=cv2.imdecode(data,1)
     # cv2.imshow('CLIENT',decimg)
@@ -45,18 +32,26 @@ def shot_rgb_t_camera(session):
     fps = 20
     resolution = 2      # 0 == 160, 120 | 1 == 320, 240 | 2 == 640, 480
     colorSpace = 11     # 11 == bgr?
-    name_id = video_service.subscribe("rgb_b", resolution, colorSpace, fps)
-    # video_service.subscribe(name, idx, resolution, color space, fps)
+    name_id = video_service.subscribe("rgb_t", resolution, colorSpace, fps)
 
-    for i in range(1):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    TCP_IP = '147.46.219.160'
+    TCP_PORT = 5001
+    sock.connect((TCP_IP, TCP_PORT))
+
+    for i in range(10):
         pepper_img = video_service.getImageRemote(name_id)
         width, height = pepper_img[0], pepper_img[1]
         array = pepper_img[6]
         img_str = str(bytearray(array))
         im = Image.frombytes("RGB", (width, height), img_str)
-        send_image(im)
+        send_image(im, sock)
+        print(i)
+        time.sleep(1)
 
     video_service.unsubscribe(name_id)
+
+    sock.close()
 
 ### config ####
 PEPPER_IP = '192.168.1.123'
