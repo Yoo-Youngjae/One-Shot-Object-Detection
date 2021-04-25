@@ -49,7 +49,7 @@ def parse_args():
                       default=1, type=int)
   parser.add_argument('--epochs', dest='max_epochs',
                       help='number of epochs to train',
-                      default=1, type=int)
+                      default=10, type=int)
   parser.add_argument('--disp_interval', dest='disp_interval',
                       help='number of iterations to display',
                       default=10, type=int)
@@ -65,7 +65,7 @@ def parse_args():
                       default=8, type=int)
   parser.add_argument('--cuda', dest='cuda',
                       help='whether use CUDA',
-                      action='store_true', default=True)
+                      action='store_true')
   parser.add_argument('--g', dest='group',
                       help='which group to train, split coco to four group',
                       default=0)
@@ -76,7 +76,7 @@ def parse_args():
                       action='store_true')
   parser.add_argument('--bs', dest='batch_size',
                       help='batch_size',
-                      default=16, type=int)
+                      default=32, type=int)
   parser.add_argument('--bs_v', dest='batch_size_val',
                       help='batch_size',
                       default=16, type=int)

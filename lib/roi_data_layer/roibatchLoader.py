@@ -66,16 +66,23 @@ class roibatchLoader(data.Dataset):
 
             self.ratio_list_batch[left_idx:(right_idx+1)] = target_ratio
 
-    self._cat_ids = [
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 
-            14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 
-            24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 
-            37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 
-            48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 
-            58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 
-            72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 
-            82, 84, 85, 86, 87, 88, 89, 90
-        ]
+    # self._cat_ids = [
+    #         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13,
+    #         14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+    #         24, 25, 27, 28, 31, 32, 33, 34, 35, 36,
+    #         37, 38, 39, 40, 41, 42, 43, 44, 46, 47,
+    #         48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+    #         58, 59, 60, 61, 62, 63, 64, 65, 67, 70,
+    #         72, 73, 74, 75, 76, 77, 78, 79, 80, 81,
+    #         82, 84, 85, 86, 87, 88, 89, 90
+    #     ]
+    # self._cat_ids = [27, 28, 31, 32, 33, 37, 39, 40, 44, 46, 47, 48, 49, 50, 51, 52, 53, 55, 57, 72, 73, 74, 75, 76, 77,
+    #                78, 80, 84, 85, 86, 87, 88, 89, 90]
+    self._cat_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+                  27, 28, 29, 30, 31, 32, 33, 34]
+    # num of cat == 34
+    # todo: Check changed code is acceptable
+    # todo 26 == backpack, blank is not skipped. so we have to rearrange the whold numbers!!
     self._classes = {
             ind + 1: cat_id for ind, cat_id in enumerate(self._cat_ids)
         }
@@ -100,10 +107,14 @@ class roibatchLoader(data.Dataset):
     blobs['gt_boxes'] = [x for x in blobs['gt_boxes'] if x[-1] in self.list_ind]
     blobs['gt_boxes'] = np.array(blobs['gt_boxes'])
 
-
     if self.training:
         # Random choice query catgory
-        catgory = blobs['gt_boxes'][:,-1]
+        try:
+            catgory = blobs['gt_boxes'][:,-1]
+        except:
+            print('minibatch_db', minibatch_db, "blobs['gt_boxes']",  blobs['gt_boxes'])
+            exit()
+
         cand = np.unique(catgory)
         if len(cand)==1:
             choice = cand[0]
@@ -282,7 +293,16 @@ class roibatchLoader(data.Dataset):
     if self.training:
         # Random choice query catgory image
         all_data = self._query[choice]
-        data     = random.choice(all_data)
+        # data     = random.choice(all_data)
+
+        # todo: check changed code is acceptable.
+        while True:
+            data = random.choice(all_data)
+            if int(data['boxes'][1]) == int(data['boxes'][3]) or int(data['boxes'][0]) == int(data['boxes'][2]):
+                continue
+            else:
+                break
+
     else:
         # Take out the purpose category for testing
         catgory = self.cat_list[choice]
@@ -302,7 +322,17 @@ class roibatchLoader(data.Dataset):
     # Get image
     path       = data['image_path']
     im = imread(path)
-    
+
+    # todo: check changed code is acceptable.
+    # check_zero = True
+    # while check_zero:
+    #     path       = data['image_path']
+    #     im = imread(path)
+    #     if 0 not in im.shape[0:3]:
+    #         check_zero = False
+    #         break
+    #     elif 0 in im.shape[0:3]:
+    #         data = random.choice(all_data)
 
     if len(im.shape) == 2:
       im = im[:,:,np.newaxis]
@@ -331,19 +361,19 @@ class roibatchLoader(data.Dataset):
       self.list = cfg.train_categories
       # Group number to class
       if len(self.list)==1:
-        self.list = [self._classes[cat] for cat in range(1,81) if cat%4 != self.list[0]]
-
+        self.list = [self._classes[cat] for cat in range(1,len(self._classes)+1) if cat%4 != self.list[0]]
+    # len(self._classes)
     elif seen==2:
       self.list = cfg.test_categories
       # Group number to class
       if len(self.list)==1:
-        self.list = [self._classes[cat] for cat in range(1,81) if cat%4 == self.list[0]]
+        self.list = [self._classes[cat] for cat in range(1,len(self._classes)+1) if cat%4 == self.list[0]]
     
     elif seen==3:
       self.list = cfg.train_categories + cfg.test_categories
       # Group number to class
       if len(self.list)==2:
-        self.list = [self._classes[cat] for cat in range(1,81)]
+        self.list = [self._classes[cat] for cat in range(1,len(self._classes)+1)]
 
     self.list_ind = [self._classes_inv[x] for x in self.list]
   

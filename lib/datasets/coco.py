@@ -310,7 +310,7 @@ class coco(imdb):
 
     coco_dt = self._COCO.loadRes(res_file)
 
-    cocoEval = customCOCOeval(self._COCO, coco_dt, "bbox")
+    cocoEval = customCOCOeval(self._COCO, coco_dt)
     cocoEval.params.imgIds = self._image_index
     cocoEval.evaluate()
     # print(cocoEval.ious)
@@ -391,36 +391,43 @@ class coco(imdb):
     # if want to use train_categories, seen = 1 
     # if want to use test_categories , seen = 2
     # if want to use both            , seen = 3
-
+    # todo: Check changed code is acceptable
     if seen==1:
       self.list = cfg.train_categories
       # Group number to class
       if len(self.list)==1:
-        self.list = [self.coco_class_ind_to_cat_id[cat] for cat in range(1,81) if cat%4 != self.list[0]]
+        self.list = [self.coco_class_ind_to_cat_id[cat] for cat in range(1,len(self._classes)) if cat%4 != self.list[0]]
 
     elif seen==2:
       self.list = cfg.test_categories
       # Group number to class
       if len(self.list)==1:
-        self.list = [self.coco_class_ind_to_cat_id[cat] for cat in range(1,81) if cat%4 == self.list[0]]
+        self.list = [self.coco_class_ind_to_cat_id[cat] for cat in range(1,len(self._classes)) if cat%4 == self.list[0]]
     
     elif seen==3:
       self.list = cfg.train_categories + cfg.test_categories
       # Group number to class
       if len(self.list)==2:
-        self.list = [self.coco_class_ind_to_cat_id[cat] for cat in range(1,81)]
+        self.list = [self.coco_class_ind_to_cat_id[cat] for cat in range(1,len(self._classes))]
 
     # Transfer categories id to class indices
-    self.inverse_list = [self.coco_cat_id_to_class_ind[i] for i in self.list ]
+    self.inverse_list = [self.coco_cat_id_to_class_ind[i] for i in self.list]
 
     # Which index need to be remove
     all_index = list(range(len(self._image_index)))
-
+    # todo: Check changed code is acceptable
     for index, info in enumerate(self.roidb):
       for cat in info['gt_classes']:
+        # if cat not in self.list:
+        #   continue
+        # elif self.coco_class_ind_to_cat_id[cat] in self.list:
+        #   if index in all_index:
+        #     all_index.remove(index)
+        #   break
+
         if self.coco_class_ind_to_cat_id[cat] in self.list:
-            all_index.remove(index)
-            break
+          all_index.remove(index)
+          break
 
     # Remove index from the end to start
     all_index.reverse()
@@ -504,8 +511,7 @@ class customCOCOeval(COCOeval):
             return stats
         if not self.eval:
             raise Exception('Please run accumulate() first')
-        self.params.iouType = 'bbox'
-        iouType = self.params.iouType
+        iouType = self.params.iouType = 'bbox'
         if iouType == 'segm' or iouType == 'bbox':
             summarize = _summarizeDets
         elif iouType == 'keypoints':
